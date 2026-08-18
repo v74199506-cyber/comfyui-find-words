@@ -1,0 +1,74 @@
+# ComfyUI Find Words
+
+Workflow-aware Ctrl+F search for ComfyUI. Find Words searches text that already
+exists in the active workflow instead of opening the browser's page search.
+
+The extension places a compact search field beside the **Graph** control. Its
+results open as a dropdown directly below the field, without covering the
+workflow with a modal.
+
+## Features
+
+- Search node titles, node types, prompts, widget values, and properties.
+- Open the search using the topbar field or **Ctrl+F** / **Cmd+F**.
+- Group matching fields by node and count repeated occurrences.
+- Navigate every occurrence with **Enter** and **Shift+Enter**.
+- Filter by text/widgets, titles/types, or properties.
+- Optional case-sensitive and whole-word matching.
+- Center and select the matching node automatically.
+- Select the exact text inside a prompt and pulse the field for visibility.
+- Clear the current query with one click.
+- Debounced input for smoother searching in large workflows.
+- Support current and legacy ComfyUI topbar layouts.
+
+## Install
+
+Clone the repository into `ComfyUI/custom_nodes/`:
+
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/v74199506-cyber/comfyui-find-words.git
+```
+
+Restart ComfyUI and hard-refresh the browser page.
+
+```text
+ComfyUI/
+└── custom_nodes/
+    └── comfyui-find-words/
+        ├── __init__.py
+        └── web/
+            └── find_words.js
+```
+
+There are no additional Python dependencies.
+
+## Use
+
+- **Ctrl+F** / **Cmd+F**: focus the search field
+- **Enter** / **Down Arrow**: next occurrence
+- **Shift+Enter** / **Up Arrow**: previous occurrence
+- **Aa**: toggle case-sensitive matching
+- **W**: toggle whole-word matching
+- **×**: clear the query
+- Click a result: focus the node, select the matching text, and close the dropdown
+- **Escape**: close the dropdown and restore the previous node selection
+
+The extension searches the active graph shown on the canvas. If you enter a
+subgraph, Ctrl+F searches that subgraph.
+
+## Compatibility
+
+Find Words is a frontend-only extension. It dynamically detects both modern
+and legacy ComfyUI topbar structures and hides its launcher when insufficient
+space is available.
+
+## Development
+
+The source is plain browser JavaScript in `web/find_words.js`. Restarting the
+backend is usually unnecessary after JavaScript edits, but the browser must be
+hard-refreshed to bypass its module cache.
+
+## License
+
+MIT

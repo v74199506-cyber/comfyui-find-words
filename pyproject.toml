@@ -1,0 +1,19 @@
+[project]
+name = "workflow-find-words"
+description = "Workflow-aware Ctrl+F search for node titles, prompts, widgets, and properties in ComfyUI."
+version = "1.0.0"
+license = { file = "LICENSE" }
+dependencies = []
+requires-python = ">=3.9"
+classifiers = [
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/v74199506-cyber/comfyui-find-words"
+Documentation = "https://github.com/v74199506-cyber/comfyui-find-words#readme"
+"Bug Tracker" = "https://github.com/v74199506-cyber/comfyui-find-words/issues"
+
+[tool.comfy]
+PublisherId = "v74199506-cyber"
+DisplayName = "ComfyUI Find Words"
