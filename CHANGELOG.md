@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.0 - 2026-08-19
+
+- Expanded the offline vocabulary with common image-prompt terminology.
+- Added related concepts for footwear, clothing, hair, framing, lighting,
+  scenery, weather, visual styles, and image qualities.
+- Connected categories and subtypes, including `shoes` and `loafers`.
+- Added transitive merging for overlapping vocabulary groups.
+- Renamed the user-facing section to **Synonyms & related** for clarity.
+
 ## 1.1.0 - 2026-08-18
 
 - Added offline synonym suggestions in English and Portuguese.

@@ -15,8 +15,10 @@ workflow with a modal.
 - Navigate every occurrence with **Enter** and **Shift+Enter**.
 - Filter by text/widgets, titles/types, or properties.
 - Optional case-sensitive and whole-word matching.
-- Offline synonym suggestions in English and Portuguese.
-- Optional synonym-expanded results using the **≈** toggle.
+- Offline synonym and related-term suggestions in English and Portuguese.
+- Prompt-oriented vocabulary for footwear, clothing, hair, framing, lighting,
+  scenery, weather, visual styles, and other frequent concepts.
+- Optional related-term expansion using the **≈** toggle.
 - Center and select the matching node automatically.
 - Select the exact text inside a prompt and pulse the field for visibility.
 - Clear the current query with one click.
@@ -52,9 +54,9 @@ There are no additional Python dependencies.
 - **Shift+Enter** / **Up Arrow**: previous occurrence
 - **Aa**: toggle case-sensitive matching
 - **W**: toggle whole-word matching
-- **≈**: include known synonyms in the workflow results
+- **≈**: include known synonyms and related terms in the workflow results
 - **×**: clear the query
-- Click a synonym chip: search for that suggested word
+- Click a suggestion chip: search for that synonym or related term
 - Click a result: focus the node, select the matching text, and close the dropdown
 - **Escape**: close the dropdown and restore the previous node selection
 
@@ -67,9 +69,11 @@ Find Words is a frontend-only extension. It dynamically detects both modern
 and legacy ComfyUI topbar structures and hides its launcher when insufficient
 space is available.
 
-Synonyms come from a small curated dictionary bundled with the extension. The
+Suggestions come from a curated prompt vocabulary bundled with the extension.
+It includes strict synonyms and useful category relationships: for example,
+searching for `shoes` can also find `loafers`, `sneakers`, or `boots`. The
 feature works offline, sends no prompt text to external services, and is meant
-to offer useful suggestions rather than a complete linguistic thesaurus.
+to help explore prompts rather than act as a complete linguistic thesaurus.
 
 ## Development
 

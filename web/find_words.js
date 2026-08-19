@@ -4,7 +4,9 @@ const EXTENSION_NAME = "Comfy.FindWords";
 const COMMAND_ID = "Comfy.FindWords.Open";
 const STYLE_ID = "comfy-find-words-style";
 
-// Small, curated groups keep synonym suggestions fast, private, and available offline.
+// Curated prompt vocabulary keeps related-term search fast, private, and offline.
+// Groups intentionally include synonyms plus useful category/type relationships
+// (for example, shoes -> loafers) that matter when searching image prompts.
 const SYNONYM_GROUPS = [
   ["beautiful", "gorgeous", "stunning", "attractive", "elegant", "lovely"],
   ["realistic", "photorealistic", "lifelike", "natural"],
@@ -28,6 +30,64 @@ const SYNONYM_GROUPS = [
   ["waterfall", "cascade"],
   ["photo", "photograph", "picture", "image"],
   ["portrait", "headshot", "likeness"],
+  ["shoes", "shoe", "footwear", "loafers", "sneakers", "trainers", "boots", "sandals", "heels", "pumps", "flats", "oxfords", "moccasins", "slippers"],
+  ["loafers", "moccasins", "slip-ons", "penny loafers"],
+  ["sneakers", "trainers", "running shoes", "athletic shoes", "tennis shoes"],
+  ["boots", "ankle boots", "knee-high boots", "combat boots", "cowboy boots"],
+  ["heels", "high heels", "stilettos", "pumps", "platform heels"],
+  ["sandals", "flip-flops", "slides", "strappy sandals"],
+  ["clothes", "clothing", "outfit", "attire", "apparel", "wardrobe", "garment", "dress", "shirt", "pants", "jacket", "skirt", "underwear", "hat"],
+  ["dress", "gown", "sundress", "evening dress", "maxi dress", "minidress"],
+  ["shirt", "blouse", "top", "t-shirt", "tee", "button-up shirt"],
+  ["pants", "trousers", "jeans", "slacks", "leggings"],
+  ["jacket", "coat", "blazer", "cardigan", "parka", "overcoat"],
+  ["skirt", "miniskirt", "maxi skirt", "pleated skirt", "pencil skirt"],
+  ["underwear", "lingerie", "panties", "bra", "undergarments"],
+  ["hat", "cap", "beanie", "beret", "fedora", "headwear"],
+  ["bag", "handbag", "purse", "backpack", "clutch", "satchel"],
+  ["jewelry", "necklace", "earrings", "bracelet", "ring", "accessories"],
+  ["hair", "hairstyle", "locks", "tresses", "blonde", "brunette", "redhead", "black hair", "long hair", "short hair", "curly hair", "straight hair"],
+  ["blonde", "blond", "golden hair", "fair hair"],
+  ["brunette", "brown hair", "chestnut hair"],
+  ["redhead", "red hair", "ginger hair", "auburn hair"],
+  ["black hair", "raven hair", "dark hair"],
+  ["long hair", "waist-length hair", "flowing hair"],
+  ["short hair", "bob cut", "pixie cut", "cropped hair"],
+  ["curly hair", "wavy hair", "ringlets", "curls"],
+  ["straight hair", "sleek hair", "smooth hair"],
+  ["eyes", "gaze", "look", "stare"],
+  ["blue eyes", "azure eyes", "sapphire eyes"],
+  ["green eyes", "emerald eyes", "jade eyes"],
+  ["brown eyes", "hazel eyes", "amber eyes"],
+  ["close-up", "closeup", "tight shot", "detail shot"],
+  ["full body", "full-body", "head-to-toe", "wide shot"],
+  ["medium shot", "mid shot", "waist-up", "half body"],
+  ["low angle", "worm's-eye view", "upward angle"],
+  ["high angle", "bird's-eye view", "overhead view", "top-down"],
+  ["background", "backdrop", "setting", "scenery", "city", "street", "beach", "ocean", "mountain", "room", "bedroom"],
+  ["city", "urban", "downtown", "cityscape", "metropolis"],
+  ["street", "road", "avenue", "alley", "boulevard"],
+  ["beach", "seaside", "shore", "coast", "oceanfront"],
+  ["ocean", "sea", "marine", "open water"],
+  ["mountain", "peak", "summit", "highlands"],
+  ["room", "interior", "indoor", "chamber"],
+  ["bedroom", "bedchamber", "sleeping room"],
+  ["sunset", "dusk", "twilight", "golden hour"],
+  ["sunrise", "dawn", "daybreak", "morning light"],
+  ["rain", "rainy", "downpour", "drizzle", "wet weather"],
+  ["snow", "snowy", "snowfall", "blizzard", "winter weather"],
+  ["lighting", "illumination", "light", "lit", "cinematic lighting", "soft lighting", "backlighting"],
+  ["cinematic lighting", "dramatic lighting", "movie lighting"],
+  ["soft lighting", "diffused light", "gentle lighting"],
+  ["backlighting", "backlit", "rim light", "edge lighting"],
+  ["colorful", "vibrant", "multicolored", "saturated"],
+  ["monochrome", "black and white", "grayscale", "desaturated"],
+  ["anime", "manga", "cel-shaded", "Japanese animation"],
+  ["illustration", "drawing", "artwork", "digital art"],
+  ["painting", "painted", "oil painting", "watercolor", "acrylic painting"],
+  ["3d", "3d render", "cgi", "computer-generated", "octane render"],
+  ["sharp", "crisp", "in focus", "high clarity"],
+  ["blurry", "blurred", "out of focus", "soft focus"],
   ["bonito", "bonita", "belo", "bela", "lindo", "linda"],
   ["realista", "fotorrealista", "natural"],
   ["detalhado", "detalhada", "minucioso", "minuciosa", "elaborado", "elaborada"],
@@ -40,6 +100,21 @@ const SYNONYM_GROUPS = [
   ["calmo", "calma", "sereno", "serena", "tranquilo", "tranquila"],
   ["floresta", "bosque", "mata"],
   ["cachoeira", "cascata", "queda-d'água"],
+  ["sapato", "sapatos", "calçado", "calçados", "mocassim", "mocassins", "tênis", "bota", "botas", "sandália", "sandálias", "salto", "sapatilha", "chinelo"],
+  ["roupa", "roupas", "vestuário", "traje", "figurino", "vestido", "saia", "camisa", "blusa", "casaco", "jaqueta"],
+  ["vestido", "vestidos", "saia", "saias", "camisa", "blusa", "casaco", "jaqueta"],
+  ["cabelo", "cabelos", "penteado", "madeixas", "loiro", "loira", "moreno", "morena", "ruivo", "ruiva"],
+  ["loiro", "loira", "cabelo loiro", "cabelo dourado"],
+  ["moreno", "morena", "cabelo castanho", "castanho"],
+  ["ruivo", "ruiva", "cabelo ruivo", "acobreado"],
+  ["cidade", "urbano", "centro", "paisagem urbana", "metrópole"],
+  ["praia", "litoral", "costa", "beira-mar"],
+  ["montanha", "pico", "cume", "serra"],
+  ["pôr do sol", "entardecer", "crepúsculo", "hora dourada"],
+  ["nascer do sol", "amanhecer", "alvorada"],
+  ["iluminação", "luz", "luminosidade"],
+  ["colorido", "colorida", "vibrante", "multicolorido", "multicolorida"],
+  ["desfocado", "desfocada", "borrado", "borrada", "fora de foco"],
 ];
 
 const state = {
@@ -137,10 +212,26 @@ function matchingIndices(text, query, wholeWord = state.wholeWord) {
 function synonymsFor(query) {
   const normalizedQuery = normalize(query).toLocaleLowerCase();
   if (!normalizedQuery) return [];
-  const group = SYNONYM_GROUPS.find((words) =>
-    words.some((word) => word.toLocaleLowerCase() === normalizedQuery)
-  );
-  return group?.filter((word) => word.toLocaleLowerCase() !== normalizedQuery) ?? [];
+  const related = new Set([normalizedQuery]);
+  const ordered = [];
+  let expanded = true;
+
+  // Merge overlapping groups so category anchors such as "footwear" connect
+  // shoes, loafers, sneakers, boots, and their more specific subtypes.
+  while (expanded) {
+    expanded = false;
+    for (const group of SYNONYM_GROUPS) {
+      if (!group.some((word) => related.has(word.toLocaleLowerCase()))) continue;
+      for (const word of group) {
+        const key = word.toLocaleLowerCase();
+        if (related.has(key)) continue;
+        related.add(key);
+        ordered.push(word);
+        expanded = true;
+      }
+    }
+  }
+  return ordered.slice(0, 60);
 }
 
 function findResults(query) {
@@ -205,7 +296,7 @@ function render() {
     ? "Search node titles, types, properties, and widget text"
     : activeOrdinal
       ? `${activeOrdinal} of ${occurrenceCount} matches`
-      : `${occurrenceCount} ${occurrenceCount === 1 ? "match" : "matches"} in ${state.results.length} ${state.results.length === 1 ? "field" : "fields"}${state.includeSynonyms ? " · synonyms on" : ""}`;
+      : `${occurrenceCount} ${occurrenceCount === 1 ? "match" : "matches"} in ${state.results.length} ${state.results.length === 1 ? "field" : "fields"}${state.includeSynonyms ? " · related terms on" : ""}`;
   if (clearButton) clearButton.hidden = !input.value;
 
   synonymsPanel.replaceChildren();
@@ -214,7 +305,7 @@ function render() {
   if (suggestions.length) {
     const label = document.createElement("span");
     label.className = "cfw-synonym-label";
-    label.textContent = "Synonyms";
+    label.textContent = "Synonyms & related";
     synonymsPanel.append(label);
     for (const synonym of suggestions) {
       const chip = document.createElement("button");
@@ -610,9 +701,9 @@ function createUi() {
         </select>
         <button class="cfw-toggle cfw-case" type="button" aria-pressed="false" title="Match case">Aa</button>
         <button class="cfw-toggle cfw-word" type="button" aria-pressed="false" title="Match whole word">W</button>
-        <button class="cfw-toggle cfw-synonym-toggle" type="button" aria-pressed="false" title="Include synonyms in results">≈</button>
+        <button class="cfw-toggle cfw-synonym-toggle" type="button" aria-pressed="false" title="Include synonyms and related terms in results">≈</button>
       </div>
-      <div class="cfw-synonyms" aria-label="Synonym suggestions" hidden></div>
+      <div class="cfw-synonyms" aria-label="Synonym and related term suggestions" hidden></div>
       <div class="cfw-results" role="listbox"></div>
       <div class="cfw-help"><span><kbd>Enter</kbd> next</span><span><kbd>Shift</kbd> + <kbd>Enter</kbd> previous</span><span><kbd>Esc</kbd> close</span></div>
     </section>`;
