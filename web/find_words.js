@@ -4,6 +4,44 @@ const EXTENSION_NAME = "Comfy.FindWords";
 const COMMAND_ID = "Comfy.FindWords.Open";
 const STYLE_ID = "comfy-find-words-style";
 
+// Small, curated groups keep synonym suggestions fast, private, and available offline.
+const SYNONYM_GROUPS = [
+  ["beautiful", "gorgeous", "stunning", "attractive", "elegant", "lovely"],
+  ["realistic", "photorealistic", "lifelike", "natural"],
+  ["detailed", "intricate", "elaborate", "complex"],
+  ["girl", "woman", "female", "lady"],
+  ["boy", "man", "male", "gentleman"],
+  ["happy", "joyful", "cheerful", "smiling"],
+  ["sad", "unhappy", "sorrowful", "melancholic"],
+  ["angry", "furious", "mad", "irritated"],
+  ["calm", "peaceful", "serene", "tranquil"],
+  ["big", "large", "huge", "gigantic", "enormous"],
+  ["small", "tiny", "little", "miniature", "compact"],
+  ["fast", "quick", "rapid", "speedy"],
+  ["slow", "sluggish", "unhurried"],
+  ["dark", "dim", "shadowy", "gloomy"],
+  ["bright", "luminous", "radiant", "vivid"],
+  ["soft", "gentle", "smooth", "delicate"],
+  ["strong", "powerful", "robust", "mighty"],
+  ["sexy", "sensual", "seductive", "alluring", "provocative"],
+  ["forest", "woods", "woodland"],
+  ["waterfall", "cascade"],
+  ["photo", "photograph", "picture", "image"],
+  ["portrait", "headshot", "likeness"],
+  ["bonito", "bonita", "belo", "bela", "lindo", "linda"],
+  ["realista", "fotorrealista", "natural"],
+  ["detalhado", "detalhada", "minucioso", "minuciosa", "elaborado", "elaborada"],
+  ["garota", "menina", "mulher", "dama"],
+  ["garoto", "menino", "homem", "rapaz"],
+  ["feliz", "alegre", "contente", "sorridente"],
+  ["triste", "infeliz", "melancólico", "melancólica"],
+  ["grande", "enorme", "gigante"],
+  ["pequeno", "pequena", "minúsculo", "minúscula"],
+  ["calmo", "calma", "sereno", "serena", "tranquilo", "tranquila"],
+  ["floresta", "bosque", "mata"],
+  ["cachoeira", "cascata", "queda-d'água"],
+];
+
 const state = {
   open: false,
   query: "",
@@ -13,6 +51,7 @@ const state = {
   filter: "all",
   caseSensitive: false,
   wholeWord: false,
+  includeSynonyms: false,
   previousSelection: null,
 };
 
@@ -30,6 +69,8 @@ let clearButton;
 let filterSelect;
 let caseButton;
 let wordButton;
+let synonymButton;
+let synonymsPanel;
 
 function normalize(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -75,7 +116,7 @@ function isWordCharacter(character) {
   return Boolean(character) && /[\p{L}\p{N}_]/u.test(character);
 }
 
-function matchingIndices(text, query) {
+function matchingIndices(text, query, wholeWord = state.wholeWord) {
   if (!query) return [];
   const source = state.caseSensitive ? text : text.toLocaleLowerCase();
   const needle = state.caseSensitive ? query : query.toLocaleLowerCase();
@@ -87,20 +128,43 @@ function matchingIndices(text, query) {
     if (index < 0) break;
     const startsWord = !isWordCharacter(text[index - 1]);
     const endsWord = !isWordCharacter(text[index + query.length]);
-    if (!state.wholeWord || (startsWord && endsWord)) indices.push(index);
+    if (!wholeWord || (startsWord && endsWord)) indices.push(index);
     cursor = index + Math.max(needle.length, 1);
   }
   return indices;
 }
 
+function synonymsFor(query) {
+  const normalizedQuery = normalize(query).toLocaleLowerCase();
+  if (!normalizedQuery) return [];
+  const group = SYNONYM_GROUPS.find((words) =>
+    words.some((word) => word.toLocaleLowerCase() === normalizedQuery)
+  );
+  return group?.filter((word) => word.toLocaleLowerCase() !== normalizedQuery) ?? [];
+}
+
 function findResults(query) {
   if (!query) return [];
 
+  const terms = [
+    { term: query, isSynonym: false },
+    ...(state.includeSynonyms
+      ? synonymsFor(query).map((term) => ({ term, isSynonym: true }))
+      : []),
+  ];
   const found = [];
   for (const node of graphNodes()) {
     for (const field of searchableFields(node)) {
       if (state.filter !== "all" && field.kind !== state.filter) continue;
-      const occurrences = matchingIndices(field.value, query);
+      const occurrences = terms.flatMap(({ term, isSynonym }) =>
+        matchingIndices(field.value, term, isSynonym ? true : state.wholeWord)
+          .map((index) => ({ index, term, isSynonym }))
+      ).sort((a, b) => a.index - b.index || b.term.length - a.term.length)
+        .filter((occurrence, index, all) =>
+          !all.slice(0, index).some((previous) =>
+            previous.index === occurrence.index && previous.term.length === occurrence.term.length
+          )
+        );
       if (occurrences.length) found.push({ node, field, occurrences });
     }
   }
@@ -141,8 +205,31 @@ function render() {
     ? "Search node titles, types, properties, and widget text"
     : activeOrdinal
       ? `${activeOrdinal} of ${occurrenceCount} matches`
-      : `${occurrenceCount} ${occurrenceCount === 1 ? "match" : "matches"} in ${state.results.length} ${state.results.length === 1 ? "field" : "fields"}`;
+      : `${occurrenceCount} ${occurrenceCount === 1 ? "match" : "matches"} in ${state.results.length} ${state.results.length === 1 ? "field" : "fields"}${state.includeSynonyms ? " · synonyms on" : ""}`;
   if (clearButton) clearButton.hidden = !input.value;
+
+  synonymsPanel.replaceChildren();
+  const suggestions = synonymsFor(state.query);
+  synonymsPanel.hidden = !state.query || !suggestions.length;
+  if (suggestions.length) {
+    const label = document.createElement("span");
+    label.className = "cfw-synonym-label";
+    label.textContent = "Synonyms";
+    synonymsPanel.append(label);
+    for (const synonym of suggestions) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "cfw-synonym-chip";
+      chip.textContent = synonym;
+      chip.title = `Search for ${synonym}`;
+      chip.addEventListener("click", () => {
+        input.value = synonym;
+        refresh();
+        input.focus();
+      });
+      synonymsPanel.append(chip);
+    }
+  }
 
   let currentNode = null;
   let group = null;
@@ -173,7 +260,8 @@ function render() {
     field.className = "cfw-field";
     field.textContent = `${result.field.label}: `;
     detail.append(field);
-    addHighlightedText(detail, snippet(result.field.value, state.query), state.query);
+    const previewTerm = result.occurrences[0]?.term ?? state.query;
+    addHighlightedText(detail, snippet(result.field.value, previewTerm), previewTerm);
 
     if (result.occurrences.length > 1) {
       const count = document.createElement("span");
@@ -248,8 +336,9 @@ function highlightResult(result, occurrenceIndex) {
   const element = textElementForResult(result);
   if (!(element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement)) return;
 
-  const query = state.query;
-  const elementOccurrences = matchingIndices(element.value, query);
+  const occurrence = result.occurrences[occurrenceIndex] ?? result.occurrences[0];
+  const query = occurrence?.term ?? state.query;
+  const elementOccurrences = matchingIndices(element.value, query, occurrence?.isSynonym ? true : state.wholeWord);
   const matchIndex = elementOccurrences[occurrenceIndex] ?? elementOccurrences[0] ?? -1;
   if (matchIndex < 0) return;
 
@@ -368,6 +457,11 @@ function injectStyle() {
     .cfw-filter { max-width: 130px; padding: 0 6px; }
     .cfw-toggle { min-width: 28px; padding: 0 7px; cursor: pointer; }
     .cfw-toggle[aria-pressed="true"] { border-color: var(--p-primary-color, #60a5fa); color: #fff; background: color-mix(in srgb, var(--p-primary-color, #60a5fa) 28%, transparent); }
+    .cfw-synonyms { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 7px 10px; border-bottom: 1px solid var(--border-color, #444); scrollbar-width: thin; }
+    .cfw-synonyms[hidden] { display: none; }
+    .cfw-synonym-label { flex: 0 0 auto; color: #888; font-size: 11px; font-weight: 650; text-transform: uppercase; }
+    .cfw-synonym-chip { flex: 0 0 auto; padding: 3px 8px; border: 1px solid #555; border-radius: 999px; color: #d8d8d8; background: #fff1; cursor: pointer; font: 11px system-ui, sans-serif; }
+    .cfw-synonym-chip:hover { border-color: #d6b73f; color: #fff; background: #facc151a; }
     .cfw-results { max-height: 400px; overflow: auto; padding: 0 7px 7px; }
     .cfw-node-group { padding-top: 5px; }
     .cfw-node-title { padding: 5px 10px 3px; color: #ddd; font-size: 12px; font-weight: 650; }
@@ -516,7 +610,9 @@ function createUi() {
         </select>
         <button class="cfw-toggle cfw-case" type="button" aria-pressed="false" title="Match case">Aa</button>
         <button class="cfw-toggle cfw-word" type="button" aria-pressed="false" title="Match whole word">W</button>
+        <button class="cfw-toggle cfw-synonym-toggle" type="button" aria-pressed="false" title="Include synonyms in results">≈</button>
       </div>
+      <div class="cfw-synonyms" aria-label="Synonym suggestions" hidden></div>
       <div class="cfw-results" role="listbox"></div>
       <div class="cfw-help"><span><kbd>Enter</kbd> next</span><span><kbd>Shift</kbd> + <kbd>Enter</kbd> previous</span><span><kbd>Esc</kbd> close</span></div>
     </section>`;
@@ -527,6 +623,8 @@ function createUi() {
   filterSelect = root.querySelector(".cfw-filter");
   caseButton = root.querySelector(".cfw-case");
   wordButton = root.querySelector(".cfw-word");
+  synonymButton = root.querySelector(".cfw-synonym-toggle");
+  synonymsPanel = root.querySelector(".cfw-synonyms");
   filterSelect.addEventListener("change", () => {
     state.filter = filterSelect.value;
     refresh();
@@ -539,6 +637,11 @@ function createUi() {
   wordButton.addEventListener("click", () => {
     state.wholeWord = !state.wholeWord;
     wordButton.setAttribute("aria-pressed", String(state.wholeWord));
+    refresh();
+  });
+  synonymButton.addEventListener("click", () => {
+    state.includeSynonyms = !state.includeSynonyms;
+    synonymButton.setAttribute("aria-pressed", String(state.includeSynonyms));
     refresh();
   });
   document.addEventListener("pointerdown", (event) => {
