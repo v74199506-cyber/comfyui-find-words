@@ -13,6 +13,7 @@ workflow with a modal.
 - Open the search using the topbar field or **Ctrl+F** / **Cmd+F**.
 - Group matching fields by node and count repeated occurrences.
 - Navigate every occurrence with **Enter** and **Shift+Enter**.
+- Keep navigating even while the matched textarea owns the visible selection.
 - Filter by text/widgets, titles/types, or properties.
 - Optional case-sensitive and whole-word matching.
 - Offline synonym and related-term suggestions in English and Portuguese.
@@ -21,6 +22,7 @@ workflow with a modal.
 - Optional related-term expansion using the **≈** toggle.
 - Center and select the matching node automatically.
 - Select the exact text inside a prompt and pulse the field for visibility.
+- Show exact matches in yellow and related-term matches in blue.
 - Clear the current query with one click.
 - Debounced input for smoother searching in large workflows.
 - Support current and legacy ComfyUI topbar layouts.

@@ -1,6 +1,6 @@
 # Briefing para a Eva
 
-Escreva um artigo curto, entre 450 e 650 palavras, apresentando a extensão **ComfyUI Find Words**, agora na versão 1.2.0. Use um tom claro, prático e moderado, sem exageros publicitários.
+Escreva um artigo curto, entre 450 e 650 palavras, apresentando a extensão **ComfyUI Find Words**, agora na versão 1.2.1. Use um tom claro, prático e moderado, sem exageros publicitários.
 
 O artigo deve:
 
@@ -15,6 +15,8 @@ O artigo deve:
    - vocabulário voltado a prompts, incluindo calçados, roupas, cabelo, enquadramento, iluminação, cenários, clima e estilos visuais;
    - botão **≈** para incluir esses termos relacionados nos resultados do workflow;
    - exemplo prático: uma pesquisa por `shoes` também pode localizar `loafers`, `sneakers` ou `boots`;
+   - correspondências exatas destacadas em amarelo e sinônimos ou termos relacionados destacados em azul;
+   - navegação segura com `Enter` e `Shift+Enter`, sem apagar ou substituir o texto selecionado no prompt;
    - centralização automática do node encontrado;
    - seleção exata do termo e destaque amarelo oscilante para chamar atenção;
    - botão para limpar a busca e atualização rápida dos resultados.
@@ -32,6 +34,6 @@ O artigo deve:
 8. Encerrar convidando o leitor a testar, relatar problemas e sugerir melhorias no repositório:
    https://github.com/v74199506-cyber/comfyui-find-words
 
-Sugestão de título: **ComfyUI Find Words 1.2: encontre sinônimos e termos relacionados no workflow**
+Sugestão de título: **ComfyUI Find Words 1.2.1: pesquisa segura com sinônimos destacados**
 
 Não invente números de usuários, desempenho, compatibilidade ou avaliações. Evite chamar a extensão de “revolucionária”, “indispensável” ou usar linguagem grandiosa.

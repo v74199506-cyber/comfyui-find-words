@@ -270,16 +270,47 @@ function snippet(text, query, radius = 42) {
   return `${start ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
-function addHighlightedText(container, text, query) {
-  const indices = matchingIndices(text, query);
+function addHighlightedText(container, text, query, related = false) {
+  const indices = matchingIndices(text, query, related ? true : state.wholeWord);
   let cursor = 0;
 
   for (const match of indices) {
     container.append(document.createTextNode(text.slice(cursor, match)));
     const mark = document.createElement("mark");
     mark.textContent = text.slice(match, match + query.length);
+    mark.dataset.related = String(related);
     container.append(mark);
     cursor = match + query.length;
+  }
+  container.append(document.createTextNode(text.slice(cursor)));
+}
+
+function addHighlightedOccurrences(container, text, occurrences) {
+  const terms = [...new Map(occurrences.map(({ term, isSynonym }) =>
+    [term.toLocaleLowerCase(), { term, isSynonym }]
+  )).values()];
+  const candidateRanges = terms.flatMap(({ term, isSynonym }) =>
+    matchingIndices(text, term, isSynonym ? true : state.wholeWord)
+      .map((index) => ({ index, term, isSynonym }))
+  ).sort((a, b) => a.index - b.index || b.term.length - a.term.length);
+  const ranges = [];
+  for (const candidate of candidateRanges) {
+    const overlaps = ranges.some((range) =>
+      candidate.index < range.index + range.term.length
+      && candidate.index + candidate.term.length > range.index
+    );
+    if (!overlaps) ranges.push(candidate);
+  }
+
+  let cursor = 0;
+  for (const range of ranges) {
+    container.append(document.createTextNode(text.slice(cursor, range.index)));
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(range.index, range.index + range.term.length);
+    mark.dataset.related = String(range.isSynonym);
+    mark.title = range.isSynonym ? `Related term: ${range.term}` : `Exact match: ${range.term}`;
+    container.append(mark);
+    cursor = range.index + range.term.length;
   }
   container.append(document.createTextNode(text.slice(cursor)));
 }
@@ -292,10 +323,11 @@ function render() {
     : state.results.slice(0, state.activeIndex)
       .reduce((total, result) => total + result.occurrences.length, 0)
       + state.activeOccurrence + 1;
+  const activeOccurrence = state.results[state.activeIndex]?.occurrences[state.activeOccurrence];
   status.textContent = !state.query
     ? "Search node titles, types, properties, and widget text"
     : activeOrdinal
-      ? `${activeOrdinal} of ${occurrenceCount} matches`
+      ? `${activeOrdinal} of ${occurrenceCount} matches · ${activeOccurrence.term}${activeOccurrence.isSynonym ? " (related)" : ""}`
       : `${occurrenceCount} ${occurrenceCount === 1 ? "match" : "matches"} in ${state.results.length} ${state.results.length === 1 ? "field" : "fields"}${state.includeSynonyms ? " · related terms on" : ""}`;
   if (clearButton) clearButton.hidden = !input.value;
 
@@ -352,7 +384,8 @@ function render() {
     field.textContent = `${result.field.label}: `;
     detail.append(field);
     const previewTerm = result.occurrences[0]?.term ?? state.query;
-    addHighlightedText(detail, snippet(result.field.value, previewTerm), previewTerm);
+    const preview = snippet(result.field.value, previewTerm);
+    addHighlightedOccurrences(detail, preview, result.occurrences);
 
     if (result.occurrences.length > 1) {
       const count = document.createElement("span");
@@ -433,17 +466,22 @@ function highlightResult(result, occurrenceIndex) {
   const matchIndex = elementOccurrences[occurrenceIndex] ?? elementOccurrences[0] ?? -1;
   if (matchIndex < 0) return;
 
-  if (highlightedElement) highlightedElement.classList.remove("cfw-match-pulse");
+  if (highlightedElement) {
+    highlightedElement.classList.remove("cfw-match-pulse");
+    delete highlightedElement.dataset.cfwRelated;
+  }
   clearTimeout(highlightTimer);
 
   element.focus({ preventScroll: true });
   element.setSelectionRange(matchIndex, matchIndex + query.length);
   element.classList.remove("cfw-match-pulse");
+  element.dataset.cfwRelated = String(Boolean(occurrence?.isSynonym));
   void element.offsetWidth;
   element.classList.add("cfw-match-pulse");
   highlightedElement = element;
   highlightTimer = setTimeout(() => {
     element.classList.remove("cfw-match-pulse");
+    delete element.dataset.cfwRelated;
     if (highlightedElement === element) highlightedElement = null;
   }, 4200);
 }
@@ -528,6 +566,8 @@ function injectStyle() {
     }
     .cfw-match-pulse { position: relative !important; z-index: 1002 !important; outline: 3px solid #facc15 !important; outline-offset: 3px; animation: cfw-widget-pulse 0.7s ease-in-out 6; }
     .cfw-match-pulse::selection { color: #111; background: #facc15; }
+    .cfw-match-pulse[data-cfw-related="true"] { outline-color: #60a5fa !important; box-shadow: 0 0 0 3px #60a5fa88, 0 0 20px 6px #60a5fa55; }
+    .cfw-match-pulse[data-cfw-related="true"]::selection { color: #07111f; background: #60a5fa; }
     .cfw-launcher { pointer-events: auto; position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px; width: 240px; height: 40px; padding: 0 11px; border: 1px solid var(--border-color, #444); border-radius: 10px; color: var(--fg-color, #ddd); background: var(--comfy-menu-bg, #202020); box-shadow: 0 2px 8px #0005; font: 13px/1 system-ui, sans-serif; }
     .cfw-launcher:hover { border-color: #666; background: color-mix(in srgb, var(--comfy-menu-bg, #202020) 88%, white); }
     .cfw-launcher:focus-within { border-color: var(--p-primary-color, #60a5fa); box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color, #60a5fa) 25%, transparent); }
@@ -563,6 +603,7 @@ function injectStyle() {
     .cfw-field { color: #888; }
     .cfw-occurrence-count { float: right; margin-left: 8px; padding: 1px 5px; border-radius: 8px; color: #d6b73f; background: #facc151a; }
     .cfw-result mark { padding: 0 1px; border-radius: 2px; color: #111; background: #facc15; }
+    .cfw-result mark[data-related="true"] { color: #07111f; background: #60a5fa; }
     .cfw-help { display: flex; gap: 14px; padding: 8px 14px 10px; border-top: 1px solid var(--border-color, #444); color: #888; font-size: 11px; }
     .cfw-help kbd { padding: 1px 4px; border: 1px solid #666; border-radius: 3px; color: #bbb; background: #1118; font: inherit; }
   `;
@@ -743,10 +784,19 @@ function createUi() {
 }
 
 function onGlobalKeydown(event) {
+  if (event.isComposing) return;
   if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLocaleLowerCase() === "f") {
     event.preventDefault();
     event.stopImmediatePropagation();
     openSearch();
+    return;
+  }
+
+  if (state.open && (event.key === "Enter" || event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const direction = event.key === "ArrowUp" || (event.key === "Enter" && event.shiftKey) ? -1 : 1;
+    move(direction);
     return;
   }
 

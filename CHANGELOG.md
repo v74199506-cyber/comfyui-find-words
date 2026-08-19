@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.1 - 2026-08-19
+
+- Fixed `Enter` and `Shift+Enter` being passed to the prompt textarea after a
+  match was selected, which could replace or delete selected prompt text.
+- Kept occurrence navigation active while the result textarea has focus.
+- Added blue highlighting for synonyms and related terms, while exact query
+  matches remain yellow.
+- Added the active matched term to the result status.
+- Highlighted every visible related occurrence in result previews.
+
 ## 1.2.0 - 2026-08-19
 
 - Expanded the offline vocabulary with common image-prompt terminology.
