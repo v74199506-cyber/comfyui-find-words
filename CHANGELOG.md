@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.3.0 - 2026-08-20
+
+- Added simultaneous highlighting for every match in the active prompt.
+- Added an aligned, non-interactive textarea highlight layer that preserves
+  normal prompt editing and follows canvas movement, zoom, and textarea scroll.
+- Kept exact matches yellow and related terms blue.
+- Added animated orange highlighting for the current occurrence.
+- Removed overlapping duplicate occurrences from navigation.
+- Improved repeated-term navigation by tracking each term's occurrence index.
+
 ## 1.2.1 - 2026-08-19
 
 - Fixed `Enter` and `Shift+Enter` being passed to the prompt textarea after a

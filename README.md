@@ -23,6 +23,8 @@ workflow with a modal.
 - Center and select the matching node automatically.
 - Select the exact text inside a prompt and pulse the field for visibility.
 - Show exact matches in yellow and related-term matches in blue.
+- Mark every occurrence inside the active prompt at the same time.
+- Show the current occurrence in animated orange while navigating.
 - Clear the current query with one click.
 - Debounced input for smoother searching in large workflows.
 - Support current and legacy ComfyUI topbar layouts.

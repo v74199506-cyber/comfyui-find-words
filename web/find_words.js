@@ -146,6 +146,10 @@ let caseButton;
 let wordButton;
 let synonymButton;
 let synonymsPanel;
+let multiHighlightOverlay;
+let multiHighlightContent;
+let multiHighlightElement;
+let multiHighlightFrame;
 
 function normalize(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -209,6 +213,21 @@ function matchingIndices(text, query, wholeWord = state.wholeWord) {
   return indices;
 }
 
+function nonOverlappingRanges(candidates) {
+  const sorted = [...candidates].sort((a, b) =>
+    a.index - b.index || b.term.length - a.term.length || Number(a.isSynonym) - Number(b.isSynonym)
+  );
+  const ranges = [];
+  for (const candidate of sorted) {
+    const overlaps = ranges.some((range) =>
+      candidate.index < range.index + range.term.length
+      && candidate.index + candidate.term.length > range.index
+    );
+    if (!overlaps) ranges.push(candidate);
+  }
+  return ranges;
+}
+
 function synonymsFor(query) {
   const normalizedQuery = normalize(query).toLocaleLowerCase();
   if (!normalizedQuery) return [];
@@ -247,15 +266,11 @@ function findResults(query) {
   for (const node of graphNodes()) {
     for (const field of searchableFields(node)) {
       if (state.filter !== "all" && field.kind !== state.filter) continue;
-      const occurrences = terms.flatMap(({ term, isSynonym }) =>
+      const candidates = terms.flatMap(({ term, isSynonym }) =>
         matchingIndices(field.value, term, isSynonym ? true : state.wholeWord)
-          .map((index) => ({ index, term, isSynonym }))
-      ).sort((a, b) => a.index - b.index || b.term.length - a.term.length)
-        .filter((occurrence, index, all) =>
-          !all.slice(0, index).some((previous) =>
-            previous.index === occurrence.index && previous.term.length === occurrence.term.length
-          )
-        );
+          .map((index, termOccurrenceIndex) => ({ index, term, isSynonym, termOccurrenceIndex }))
+      );
+      const occurrences = nonOverlappingRanges(candidates);
       if (occurrences.length) found.push({ node, field, occurrences });
     }
   }
@@ -291,16 +306,9 @@ function addHighlightedOccurrences(container, text, occurrences) {
   )).values()];
   const candidateRanges = terms.flatMap(({ term, isSynonym }) =>
     matchingIndices(text, term, isSynonym ? true : state.wholeWord)
-      .map((index) => ({ index, term, isSynonym }))
-  ).sort((a, b) => a.index - b.index || b.term.length - a.term.length);
-  const ranges = [];
-  for (const candidate of candidateRanges) {
-    const overlaps = ranges.some((range) =>
-      candidate.index < range.index + range.term.length
-      && candidate.index + candidate.term.length > range.index
-    );
-    if (!overlaps) ranges.push(candidate);
-  }
+      .map((index, termOccurrenceIndex) => ({ index, term, isSynonym, termOccurrenceIndex }))
+  );
+  const ranges = nonOverlappingRanges(candidateRanges);
 
   let cursor = 0;
   for (const range of ranges) {
@@ -406,6 +414,7 @@ function render() {
 }
 
 function refresh() {
+  clearMultiHighlight();
   state.query = input.value.trim();
   state.results = findResults(state.query);
   state.activeIndex = -1;
@@ -456,14 +465,103 @@ function textElementForResult(result) {
   });
 }
 
+function clearMultiHighlight() {
+  cancelAnimationFrame(multiHighlightFrame);
+  multiHighlightFrame = null;
+  multiHighlightOverlay?.remove();
+  multiHighlightOverlay = null;
+  multiHighlightContent = null;
+  multiHighlightElement = null;
+}
+
+function allElementRanges(element, result) {
+  const terms = [...new Map(result.occurrences.map(({ term, isSynonym }) =>
+    [term.toLocaleLowerCase(), { term, isSynonym }]
+  )).values()];
+  const candidates = terms.flatMap(({ term, isSynonym }) =>
+    matchingIndices(element.value, term, isSynonym ? true : state.wholeWord)
+      .map((index, termOccurrenceIndex) => ({ index, term, isSynonym, termOccurrenceIndex }))
+  );
+  return nonOverlappingRanges(candidates);
+}
+
+function syncMultiHighlight() {
+  if (!state.open || !multiHighlightElement?.isConnected || !multiHighlightOverlay) {
+    clearMultiHighlight();
+    return;
+  }
+
+  const element = multiHighlightElement;
+  const rect = element.getBoundingClientRect();
+  const scaleX = element.offsetWidth ? rect.width / element.offsetWidth : 1;
+  const scaleY = element.offsetHeight ? rect.height / element.offsetHeight : scaleX;
+  multiHighlightOverlay.style.left = `${rect.left}px`;
+  multiHighlightOverlay.style.top = `${rect.top}px`;
+  multiHighlightOverlay.style.width = `${rect.width}px`;
+  multiHighlightOverlay.style.height = `${rect.height}px`;
+  multiHighlightContent.style.left = `${-element.scrollLeft * scaleX}px`;
+  multiHighlightContent.style.top = `${-element.scrollTop * scaleY}px`;
+  multiHighlightContent.style.width = `${element.offsetWidth}px`;
+  multiHighlightContent.style.minHeight = `${element.scrollHeight}px`;
+  multiHighlightContent.style.transform = `scale(${scaleX}, ${scaleY})`;
+  multiHighlightFrame = requestAnimationFrame(syncMultiHighlight);
+}
+
+function showMultiHighlight(element, result, activeOccurrence) {
+  clearMultiHighlight();
+  if (!state.open) return;
+
+  const ranges = allElementRanges(element, result);
+  if (!ranges.length) return;
+
+  multiHighlightOverlay = document.createElement("div");
+  multiHighlightOverlay.className = "cfw-textarea-highlights";
+  multiHighlightOverlay.setAttribute("aria-hidden", "true");
+  multiHighlightContent = document.createElement("div");
+  multiHighlightContent.className = "cfw-textarea-highlight-content";
+
+  const computed = getComputedStyle(element);
+  for (const property of [
+    "fontFamily", "fontSize", "fontStyle", "fontWeight", "lineHeight",
+    "letterSpacing", "textAlign", "textIndent", "textTransform", "tabSize",
+    "wordBreak", "overflowWrap", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+    "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  ]) {
+    multiHighlightContent.style[property] = computed[property];
+  }
+  multiHighlightContent.style.borderStyle = "solid";
+  multiHighlightContent.style.borderColor = "transparent";
+
+  let cursor = 0;
+  for (const range of ranges) {
+    multiHighlightContent.append(document.createTextNode(element.value.slice(cursor, range.index)));
+    const mark = document.createElement("mark");
+    mark.textContent = element.value.slice(range.index, range.index + range.term.length);
+    mark.dataset.related = String(range.isSynonym);
+    const isActive = range.term.toLocaleLowerCase() === activeOccurrence.term.toLocaleLowerCase()
+      && range.termOccurrenceIndex === activeOccurrence.termOccurrenceIndex;
+    mark.dataset.active = String(isActive);
+    multiHighlightContent.append(mark);
+    cursor = range.index + range.term.length;
+  }
+  multiHighlightContent.append(document.createTextNode(element.value.slice(cursor)));
+  multiHighlightOverlay.append(multiHighlightContent);
+  document.body.append(multiHighlightOverlay);
+  multiHighlightElement = element;
+  syncMultiHighlight();
+}
+
 function highlightResult(result, occurrenceIndex) {
   const element = textElementForResult(result);
-  if (!(element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement)) return;
+  if (!(element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement)) {
+    clearMultiHighlight();
+    return;
+  }
 
   const occurrence = result.occurrences[occurrenceIndex] ?? result.occurrences[0];
   const query = occurrence?.term ?? state.query;
   const elementOccurrences = matchingIndices(element.value, query, occurrence?.isSynonym ? true : state.wholeWord);
-  const matchIndex = elementOccurrences[occurrenceIndex] ?? elementOccurrences[0] ?? -1;
+  const matchIndex = elementOccurrences[occurrence?.termOccurrenceIndex ?? 0] ?? elementOccurrences[0] ?? -1;
   if (matchIndex < 0) return;
 
   if (highlightedElement) {
@@ -479,6 +577,7 @@ function highlightResult(result, occurrenceIndex) {
   void element.offsetWidth;
   element.classList.add("cfw-match-pulse");
   highlightedElement = element;
+  showMultiHighlight(element, result, occurrence);
   highlightTimer = setTimeout(() => {
     element.classList.remove("cfw-match-pulse");
     delete element.dataset.cfwRelated;
@@ -544,6 +643,7 @@ function closeSearch(restoreSelection = false) {
   if (!state.open) return;
   state.open = false;
   root.hidden = true;
+  clearMultiHighlight();
 
   if (restoreSelection && state.previousSelection && app.canvas) {
     app.canvas.deselectAllNodes?.();
@@ -565,9 +665,15 @@ function injectStyle() {
       50% { outline-color: #fff3a3; box-shadow: 0 0 0 5px #facc1599, 0 0 28px 10px #facc1577; }
     }
     .cfw-match-pulse { position: relative !important; z-index: 1002 !important; outline: 3px solid #facc15 !important; outline-offset: 3px; animation: cfw-widget-pulse 0.7s ease-in-out 6; }
-    .cfw-match-pulse::selection { color: #111; background: #facc15; }
-    .cfw-match-pulse[data-cfw-related="true"] { outline-color: #60a5fa !important; box-shadow: 0 0 0 3px #60a5fa88, 0 0 20px 6px #60a5fa55; }
-    .cfw-match-pulse[data-cfw-related="true"]::selection { color: #07111f; background: #60a5fa; }
+    .cfw-match-pulse::selection { color: #111; background: #f97316; }
+    .cfw-match-pulse[data-cfw-related="true"] { outline-color: #f97316 !important; box-shadow: 0 0 0 3px #f9731688, 0 0 20px 6px #f9731655; }
+    .cfw-match-pulse[data-cfw-related="true"]::selection { color: #111; background: #f97316; }
+    .cfw-textarea-highlights { position: fixed; z-index: 1003; overflow: hidden; pointer-events: none; }
+    .cfw-textarea-highlight-content { position: absolute; box-sizing: border-box; transform-origin: top left; white-space: pre-wrap; color: transparent; background: transparent; }
+    .cfw-textarea-highlight-content mark { padding: 0; border-radius: 2px; color: #111; background: #facc15; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .cfw-textarea-highlight-content mark[data-related="true"] { color: #07111f; background: #60a5fa; }
+    .cfw-textarea-highlight-content mark[data-active="true"] { color: #111; background: #f97316; box-shadow: 0 0 0 2px #f9731699; animation: cfw-active-match 0.65s ease-in-out infinite alternate; }
+    @keyframes cfw-active-match { from { filter: brightness(0.9); } to { filter: brightness(1.35); } }
     .cfw-launcher { pointer-events: auto; position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px; width: 240px; height: 40px; padding: 0 11px; border: 1px solid var(--border-color, #444); border-radius: 10px; color: var(--fg-color, #ddd); background: var(--comfy-menu-bg, #202020); box-shadow: 0 2px 8px #0005; font: 13px/1 system-ui, sans-serif; }
     .cfw-launcher:hover { border-color: #666; background: color-mix(in srgb, var(--comfy-menu-bg, #202020) 88%, white); }
     .cfw-launcher:focus-within { border-color: var(--p-primary-color, #60a5fa); box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color, #60a5fa) 25%, transparent); }
