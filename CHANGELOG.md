@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## 1.3.1 - 2026-08-23
+
+- Fixed `Ctrl+Z` being able to focus and open the search after a ComfyUI widget
+  rebuild.
+- Hardened shortcut recognition to require both the `F` key value and physical
+  `KeyF` code.
+- Preserved normal undo/redo handling by ComfyUI.
+- Added a short focus guard for non-search `Ctrl`/`Cmd` shortcuts.
+
 ## 1.3.0 - 2026-08-20
 
 - Added simultaneous highlighting for every match in the active prompt.

@@ -11,6 +11,7 @@ workflow with a modal.
 
 - Search node titles, node types, prompts, widget values, and properties.
 - Open the search using the topbar field or **Ctrl+F** / **Cmd+F**.
+- Keep undo/redo and other `Ctrl`/`Cmd` shortcuts isolated from the search launcher.
 - Group matching fields by node and count repeated occurrences.
 - Navigate every occurrence with **Enter** and **Shift+Enter**.
 - Keep navigating even while the matched textarea owns the visible selection.

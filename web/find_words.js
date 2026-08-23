@@ -150,6 +150,7 @@ let multiHighlightOverlay;
 let multiHighlightContent;
 let multiHighlightElement;
 let multiHighlightFrame;
+let launcherFocusBlockedUntil = 0;
 
 function normalize(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -730,7 +731,14 @@ function createLauncher() {
     <kbd>Ctrl F</kbd>`;
   input = launcher.querySelector(".cfw-launcher-input");
   clearButton = launcher.querySelector(".cfw-clear");
+  input.addEventListener("pointerdown", () => {
+    launcherFocusBlockedUntil = 0;
+  });
   input.addEventListener("focus", () => {
+    if (!state.open && performance.now() < launcherFocusBlockedUntil) {
+      input.blur();
+      return;
+    }
     if (!state.open) openSearch();
   });
   input.addEventListener("input", () => {
@@ -759,6 +767,7 @@ function createLauncher() {
   launcher.addEventListener("pointerdown", (event) => {
     if (event.target === input) return;
     event.preventDefault();
+    launcherFocusBlockedUntil = 0;
     input.focus();
   });
   return launcher;
@@ -891,7 +900,21 @@ function createUi() {
 
 function onGlobalKeydown(event) {
   if (event.isComposing) return;
-  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLocaleLowerCase() === "f") {
+  const hasPrimaryModifier = event.ctrlKey || event.metaKey;
+  const isFindShortcut = hasPrimaryModifier
+    && !event.altKey
+    && !event.shiftKey
+    && event.code === "KeyF"
+    && event.key.toLocaleLowerCase() === "f";
+
+  if (hasPrimaryModifier && !isFindShortcut) {
+    // Some ComfyUI undo/redo operations rebuild focused widgets. During that
+    // hand-off the browser can focus the topbar search input unintentionally.
+    // Do not cancel the original shortcut; only suppress accidental launcher focus.
+    launcherFocusBlockedUntil = performance.now() + 1000;
+  }
+
+  if (isFindShortcut) {
     event.preventDefault();
     event.stopImmediatePropagation();
     openSearch();

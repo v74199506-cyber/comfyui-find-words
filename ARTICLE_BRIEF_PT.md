@@ -1,6 +1,6 @@
 # Briefing para a Eva
 
-Escreva um artigo curto, entre 450 e 650 palavras, apresentando a extensão **ComfyUI Find Words**, agora na versão 1.3.0. Use um tom claro, prático e moderado, sem exageros publicitários.
+Escreva um artigo curto, entre 450 e 650 palavras, apresentando a extensão **ComfyUI Find Words**, agora na versão 1.3.1. Use um tom claro, prático e moderado, sem exageros publicitários.
 
 O artigo deve:
 
