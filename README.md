@@ -12,6 +12,8 @@ workflow with a modal.
 - Search node titles, node types, prompts, widget values, and properties.
 - Open the search using the topbar field or **Ctrl+F** / **Cmd+F**.
 - Keep undo/redo and other `Ctrl`/`Cmd` shortcuts isolated from the search launcher.
+- Choose an automatic, icon-only, compact, standard, or wide launcher layout.
+- Automatically shrink or hide the launcher when another topbar control needs the space.
 - Group matching fields by node and count repeated occurrences.
 - Navigate every occurrence with **Enter** and **Shift+Enter**.
 - Keep navigating even while the matched textarea owns the visible selection.
@@ -61,12 +63,28 @@ There are no additional Python dependencies.
 - **W**: toggle whole-word matching
 - **≈**: include known synonyms and related terms in the workflow results
 - **×**: clear the query
+- **⚙**: choose the search field appearance
 - Click a suggestion chip: search for that synonym or related term
 - Click a result: focus the node, select the matching text, and close the dropdown
 - **Escape**: close the dropdown and restore the previous node selection
 
 The extension searches the active graph shown on the canvas. If you enter a
 subgraph, Ctrl+F searches that subgraph.
+
+### Search field appearance
+
+Use the gear inside the launcher to choose:
+
+- **Auto**: selects the largest safe layout without covering nearby controls.
+- **Icon only**: keeps only the search icon and the small settings control.
+- **Compact**: shows the icon and a short text field.
+- **Standard**: shows the regular field and the Ctrl+F hint.
+- **Wide**: uses a larger field when the topbar has enough room.
+
+The preference is saved in the browser. Every fixed size still falls back to a
+smaller layout if another extension or workflow control occupies the space. If
+there is no safe topbar space, the launcher stays hidden and Ctrl+F opens a
+temporary field below the bar.
 
 ## Compatibility
 

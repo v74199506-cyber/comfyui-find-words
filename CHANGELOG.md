@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.4.0 - 2026-09-20
+
+- Added a settings gear inside the topbar search launcher.
+- Added Auto, Icon only, Compact, Standard, and Wide appearance modes.
+- Persisted the selected appearance in browser storage.
+- Added collision detection for workflow tabs and third-party topbar controls.
+- Added automatic fallback to smaller modes when space becomes constrained.
+- Added live layout updates for topbar mutations and resized controls.
+- Added a temporary below-topbar field for Ctrl+F when no safe toolbar space exists.
+
 ## 1.3.1 - 2026-08-23
 
 - Fixed `Ctrl+Z` being able to focus and open the search after a ComfyUI widget

@@ -3,6 +3,13 @@ import { app } from "../../scripts/app.js";
 const EXTENSION_NAME = "Comfy.FindWords";
 const COMMAND_ID = "Comfy.FindWords.Open";
 const STYLE_ID = "comfy-find-words-style";
+const LAUNCHER_PREFERENCE_KEY = "comfy-find-words.launcher-mode";
+const LAUNCHER_WIDTHS = {
+  icon: 68,
+  compact: 160,
+  standard: 240,
+  wide: 320,
+};
 
 // Curated prompt vocabulary keeps related-term search fast, private, and offline.
 // Groups intentionally include synonyms plus useful category/type relationships
@@ -136,6 +143,7 @@ let status;
 let resultsList;
 let launcher;
 let launcherObserver;
+let launcherResizeObserver;
 let launcherMountFrame;
 let highlightedElement;
 let highlightTimer;
@@ -151,6 +159,27 @@ let multiHighlightContent;
 let multiHighlightElement;
 let multiHighlightFrame;
 let launcherFocusBlockedUntil = 0;
+let launcherMode = loadLauncherMode();
+let launcherSettings;
+let launcherSettingsButton;
+
+function loadLauncherMode() {
+  try {
+    const value = localStorage.getItem(LAUNCHER_PREFERENCE_KEY);
+    return ["auto", "icon", "compact", "standard", "wide"].includes(value) ? value : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+function saveLauncherMode(mode) {
+  launcherMode = mode;
+  try {
+    localStorage.setItem(LAUNCHER_PREFERENCE_KEY, mode);
+  } catch {
+    // Storage can be unavailable in hardened browser profiles; the session still works.
+  }
+}
 
 function normalize(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -630,6 +659,7 @@ function openSearch() {
     return;
   }
   state.open = true;
+  mountLauncher();
   state.previousSelection = app.canvas?.selected_nodes
     ? { ...app.canvas.selected_nodes }
     : null;
@@ -645,6 +675,7 @@ function closeSearch(restoreSelection = false) {
   state.open = false;
   root.hidden = true;
   clearMultiHighlight();
+  mountLauncher();
 
   if (restoreSelection && state.previousSelection && app.canvas) {
     app.canvas.deselectAllNodes?.();
@@ -675,17 +706,36 @@ function injectStyle() {
     .cfw-textarea-highlight-content mark[data-related="true"] { color: #07111f; background: #60a5fa; }
     .cfw-textarea-highlight-content mark[data-active="true"] { color: #111; background: #f97316; box-shadow: 0 0 0 2px #f9731699; animation: cfw-active-match 0.65s ease-in-out infinite alternate; }
     @keyframes cfw-active-match { from { filter: brightness(0.9); } to { filter: brightness(1.35); } }
-    .cfw-launcher { pointer-events: auto; position: fixed; z-index: 1000; display: flex; align-items: center; gap: 8px; width: 240px; height: 40px; padding: 0 11px; border: 1px solid var(--border-color, #444); border-radius: 10px; color: var(--fg-color, #ddd); background: var(--comfy-menu-bg, #202020); box-shadow: 0 2px 8px #0005; font: 13px/1 system-ui, sans-serif; }
+    .cfw-launcher { pointer-events: auto; position: fixed; z-index: 100001; display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 240px; height: 40px; padding: 0 7px 0 11px; border: 1px solid var(--border-color, #444); border-radius: 10px; color: var(--fg-color, #ddd); background: var(--comfy-menu-bg, #202020); box-shadow: 0 2px 8px #0005; font: 13px/1 system-ui, sans-serif; transition: width 140ms ease, padding 140ms ease; }
+    .cfw-launcher[hidden] { display: none; }
     .cfw-launcher:hover { border-color: #666; background: color-mix(in srgb, var(--comfy-menu-bg, #202020) 88%, white); }
     .cfw-launcher:focus-within { border-color: var(--p-primary-color, #60a5fa); box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color, #60a5fa) 25%, transparent); }
-    .cfw-launcher-icon { color: #aaa; font-size: 14px; }
+    .cfw-launcher-icon { flex: 0 0 auto; color: #aaa; font-size: 14px; }
     .cfw-launcher-input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
     .cfw-launcher-input::placeholder { color: #aaa; opacity: 1; }
     .cfw-clear { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; color: #aaa; background: transparent; cursor: pointer; font: 16px/1 system-ui, sans-serif; }
     .cfw-clear:hover { color: #fff; background: #fff2; }
     .cfw-clear[hidden] { display: none; }
     .cfw-launcher kbd { flex: 0 0 auto; padding: 3px 5px; border: 1px solid #555; border-radius: 4px; color: #999; background: #1118; font: 10px/1 system-ui, sans-serif; }
-    .cfw-launcher[data-compact="true"] kbd { display: none; }
+    .cfw-launcher-settings-button { flex: 0 0 auto; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; color: #888; background: transparent; cursor: pointer; font: 14px/1 system-ui, sans-serif; }
+    .cfw-launcher-settings-button:hover, .cfw-launcher-settings-button[aria-expanded="true"] { color: #fff; background: #fff2; }
+    .cfw-launcher-settings { position: absolute; top: calc(100% + 6px); left: 0; width: 220px; padding: 7px; border: 1px solid var(--border-color, #444); border-radius: 9px; color: var(--fg-color, #eee); background: var(--comfy-menu-bg, #202020); box-shadow: 0 12px 32px #000a; }
+    .cfw-launcher-settings[hidden] { display: none; }
+    .cfw-launcher-settings-title { padding: 5px 7px 7px; color: #888; font-size: 11px; font-weight: 650; text-transform: uppercase; }
+    .cfw-launcher-mode { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px; color: inherit; background: transparent; text-align: left; cursor: pointer; font: 12px/1.2 system-ui, sans-serif; }
+    .cfw-launcher-mode:hover { background: #fff2; }
+    .cfw-launcher-mode[aria-checked="true"] { color: #fff; background: color-mix(in srgb, var(--p-primary-color, #60a5fa) 22%, transparent); }
+    .cfw-launcher-mode-preview { color: #aaa; text-align: center; }
+    .cfw-launcher[data-mode="icon"] { gap: 0; padding: 0 5px 0 12px; cursor: pointer; }
+    .cfw-launcher[data-mode="icon"] .cfw-launcher-input,
+    .cfw-launcher[data-mode="icon"] .cfw-clear,
+    .cfw-launcher[data-mode="icon"] kbd { display: none; }
+    .cfw-launcher[data-mode="icon"] .cfw-launcher-icon { flex: 1; }
+    .cfw-launcher[data-mode="icon"] .cfw-launcher-settings-button { width: 20px; height: 20px; font-size: 12px; }
+    .cfw-launcher[data-mode="compact"] kbd { display: none; }
+    .cfw-launcher[data-mode="compact"] .cfw-launcher-input::placeholder { font-size: 12px; }
+    .cfw-launcher[data-mode="standard"] kbd,
+    .cfw-launcher[data-mode="wide"] kbd { display: inline-block; }
     .cfw-root { position: fixed; z-index: 100000; pointer-events: auto; }
     .cfw-root[hidden] { display: none; }
     .cfw-panel { width: 100%; max-height: min(520px, calc(100vh - 120px)); overflow: hidden; border: 1px solid var(--border-color, #444); border-radius: 10px; color: var(--fg-color, #eee); background: var(--comfy-menu-bg, #202020); box-shadow: 0 14px 40px #0009; font: 13px/1.4 system-ui, sans-serif; }
@@ -728,9 +778,26 @@ function createLauncher() {
     <i class="pi pi-search cfw-launcher-icon" aria-hidden="true"></i>
     <input class="cfw-launcher-input" type="search" autocomplete="off" spellcheck="false" placeholder="Find words…" aria-label="Find words in workflow" aria-keyshortcuts="Control+F Meta+F">
     <button class="cfw-clear" type="button" title="Clear search" aria-label="Clear search" hidden>×</button>
-    <kbd>Ctrl F</kbd>`;
+    <kbd>Ctrl F</kbd>
+    <button class="cfw-launcher-settings-button" type="button" title="Search field appearance" aria-label="Search field appearance" aria-expanded="false">⚙</button>
+    <div class="cfw-launcher-settings" role="radiogroup" aria-label="Search field appearance" hidden>
+      <div class="cfw-launcher-settings-title">Search field appearance</div>
+      <button class="cfw-launcher-mode" type="button" role="radio" data-mode="auto"><span class="cfw-launcher-mode-preview">↔</span><span>Auto · fit available space</span></button>
+      <button class="cfw-launcher-mode" type="button" role="radio" data-mode="icon"><span class="cfw-launcher-mode-preview">⌕</span><span>Icon only</span></button>
+      <button class="cfw-launcher-mode" type="button" role="radio" data-mode="compact"><span class="cfw-launcher-mode-preview">⌕―</span><span>Compact</span></button>
+      <button class="cfw-launcher-mode" type="button" role="radio" data-mode="standard"><span class="cfw-launcher-mode-preview">⌕━━</span><span>Standard</span></button>
+      <button class="cfw-launcher-mode" type="button" role="radio" data-mode="wide"><span class="cfw-launcher-mode-preview">⌕━━━━</span><span>Wide</span></button>
+    </div>`;
   input = launcher.querySelector(".cfw-launcher-input");
   clearButton = launcher.querySelector(".cfw-clear");
+  launcherSettingsButton = launcher.querySelector(".cfw-launcher-settings-button");
+  launcherSettings = launcher.querySelector(".cfw-launcher-settings");
+  const syncModeChecks = () => {
+    for (const option of launcherSettings.querySelectorAll(".cfw-launcher-mode")) {
+      option.setAttribute("aria-checked", String(option.dataset.mode === launcherMode));
+    }
+  };
+  syncModeChecks();
   input.addEventListener("pointerdown", () => {
     launcherFocusBlockedUntil = 0;
   });
@@ -752,6 +819,37 @@ function createLauncher() {
     refresh();
     input.focus();
   });
+  launcherSettingsButton.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  launcherSettingsButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const willOpen = launcherSettings.hidden;
+    launcherSettings.hidden = !willOpen;
+    launcherSettingsButton.setAttribute("aria-expanded", String(willOpen));
+    if (root && state.open) {
+      if (willOpen) root.hidden = true;
+      else refresh();
+    }
+  });
+  for (const option of launcherSettings.querySelectorAll(".cfw-launcher-mode")) {
+    option.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    option.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      saveLauncherMode(option.dataset.mode);
+      syncModeChecks();
+      launcherSettings.hidden = true;
+      launcherSettingsButton.setAttribute("aria-expanded", "false");
+      mountLauncher();
+      if (state.open) refresh();
+    });
+  }
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -766,9 +864,20 @@ function createLauncher() {
   });
   launcher.addEventListener("pointerdown", (event) => {
     if (event.target === input) return;
+    if (event.target.closest(".cfw-launcher-settings-button, .cfw-launcher-settings")) return;
     event.preventDefault();
     launcherFocusBlockedUntil = 0;
+    if (launcher.dataset.mode === "icon") {
+      openSearch();
+      return;
+    }
     input.focus();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!launcher?.contains(event.target)) {
+      launcherSettings.hidden = true;
+      launcherSettingsButton.setAttribute("aria-expanded", "false");
+    }
   });
   return launcher;
 }
@@ -782,13 +891,68 @@ function positionDropdown() {
   root.style.width = `${Math.min(620, availableWidth)}px`;
 }
 
+function firstTopbarCollision(left, graphRect, rightControl) {
+  const candidates = document.querySelectorAll(
+    "button, input, select, a, [role='button'], [role='tab'], [role='checkbox'], [role='combobox']"
+  );
+  let collisionLeft = rightControl.getBoundingClientRect().left;
+  let collisionElement = rightControl;
+
+  for (const element of candidates) {
+    if (!(element instanceof HTMLElement) || !element.isConnected) continue;
+    if (launcher?.contains(element) || graphRect.width <= 0) continue;
+    if (element === rightControl || rightControl.contains(element)) continue;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 18 || rect.height < 18) continue;
+    if (rect.right <= left || rect.left >= collisionLeft) continue;
+    if (rect.bottom <= graphRect.top + 3 || rect.top >= graphRect.bottom - 3) continue;
+    if (rect.left < collisionLeft) {
+      collisionLeft = rect.left;
+      collisionElement = element;
+    }
+  }
+  return { left: collisionLeft, element: collisionElement };
+}
+
+function effectiveLauncherMode(preference, availableWidth) {
+  if (state.open && preference === "icon") return "compact";
+
+  const fallbackOrder = {
+    auto: ["standard", "compact", "icon"],
+    icon: ["icon"],
+    compact: ["compact", "icon"],
+    standard: ["standard", "compact", "icon"],
+    wide: ["wide", "standard", "compact", "icon"],
+  }[preference] ?? ["standard", "compact", "icon"];
+
+  return fallbackOrder.find((mode) => availableWidth >= LAUNCHER_WIDTHS[mode]) ?? "icon";
+}
+
+function usableTopbarElement(element) {
+  if (!(element instanceof HTMLElement) || !element.isConnected) return false;
+  const rect = element.getBoundingClientRect();
+  const visible = typeof element.checkVisibility === "function"
+    ? element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+    : getComputedStyle(element).visibility !== "hidden" && getComputedStyle(element).display !== "none";
+  return visible
+    && rect.width >= 24
+    && rect.height >= 24
+    && rect.right > 0
+    && rect.bottom > 0
+    && rect.left < window.innerWidth
+    && rect.top < window.innerHeight;
+}
+
 function mountLauncher() {
-  const breadcrumb = document.querySelector('[data-testid="subgraph-breadcrumb"]');
-  const workflowButton = breadcrumb?.querySelector('button[aria-label="Workflow actions"]')
-    ?? [...(breadcrumb?.querySelectorAll("button") ?? [])].find((element) =>
-      element.textContent?.trim().includes("Graph")
-    );
-  const graphControl = workflowButton?.parentElement ?? breadcrumb;
+  const breadcrumbs = [...document.querySelectorAll('[data-testid="subgraph-breadcrumb"]')];
+  const workflowButton = breadcrumbs
+    .flatMap((breadcrumb) => [...breadcrumb.querySelectorAll("button")])
+    .find((element) => usableTopbarElement(element) && (
+      element.getAttribute("aria-label") === "Workflow actions"
+      || element.textContent?.trim().includes("Graph")
+    ));
+  const breadcrumb = breadcrumbs.find(usableTopbarElement);
+  const graphControl = workflowButton ?? breadcrumb;
 
   const legacyTopbar = document.querySelector('[data-testid="legacy-topbar-container"]');
   const firstLegacyButton = [...(legacyTopbar?.querySelectorAll("button") ?? [])]
@@ -800,28 +964,69 @@ function mountLauncher() {
     ?? firstLegacyButton
     ?? document.querySelector('[data-testid="action-bar-card"]');
 
-  if (!(graphControl instanceof HTMLElement) || !(rightControl instanceof HTMLElement)) {
+  if (!(rightControl instanceof HTMLElement)) {
     if (launcher) launcher.hidden = true;
     return false;
+  }
+
+  if (!(graphControl instanceof HTMLElement) || !usableTopbarElement(graphControl)) {
+    const button = createLauncher();
+    if (button.parentElement !== document.body) document.body.append(button);
+    button.hidden = !state.open;
+    if (button.hidden) return false;
+    const toolsRect = rightControl.getBoundingClientRect();
+    const width = Math.min(LAUNCHER_WIDTHS.standard, Math.max(LAUNCHER_WIDTHS.compact, window.innerWidth - 20));
+    button.style.left = "10px";
+    button.style.top = `${Math.round(toolsRect.bottom + 6)}px`;
+    button.style.width = `${width}px`;
+    button.style.height = "38px";
+    button.dataset.mode = "compact";
+    button.dataset.preference = launcherMode;
+    button.dataset.floating = "true";
+    button.title = "Find words in workflow (Ctrl+F)";
+    positionDropdown();
+    return true;
   }
 
   const graphRect = graphControl.getBoundingClientRect();
   const toolsRect = rightControl.getBoundingClientRect();
   const left = Math.round(graphRect.right + 10);
-  const availableWidth = Math.floor(toolsRect.left - left - 10);
-  const width = Math.min(280, availableWidth);
+  const collision = firstTopbarCollision(left, graphRect, rightControl);
+  const safeRight = Math.min(toolsRect.left, collision.left);
+  const availableWidth = Math.floor(safeRight - left - 8);
   const button = createLauncher();
 
   if (button.parentElement !== document.body) document.body.append(button);
-  button.hidden = width < 40;
+  const floating = availableWidth < LAUNCHER_WIDTHS.icon;
+  button.hidden = floating && !state.open;
   if (button.hidden) return false;
 
-  button.style.left = `${left}px`;
-  button.style.top = `${Math.round(graphRect.top)}px`;
-  button.style.width = `${Math.max(40, width)}px`;
+  const usableWidth = floating
+    ? Math.max(LAUNCHER_WIDTHS.compact, Math.min(LAUNCHER_WIDTHS.standard, window.innerWidth - graphRect.left - 12))
+    : availableWidth;
+  const effectiveMode = floating ? "compact" : effectiveLauncherMode(launcherMode, usableWidth);
+  const preferredWidth = LAUNCHER_WIDTHS[effectiveMode];
+  const width = Math.max(LAUNCHER_WIDTHS.icon, Math.min(preferredWidth, usableWidth));
+
+  button.style.left = `${floating ? Math.round(graphRect.left) : left}px`;
+  button.style.top = `${floating ? Math.round(graphRect.bottom + 6) : Math.round(graphRect.top)}px`;
+  button.style.width = `${width}px`;
   button.style.height = `${Math.max(36, Math.round(graphRect.height))}px`;
-  button.dataset.compact = String(width < 150);
+  button.dataset.mode = effectiveMode;
+  button.dataset.preference = launcherMode;
+  button.dataset.floating = String(floating);
+  button.title = effectiveMode === launcherMode || launcherMode === "auto"
+    ? "Find words in workflow (Ctrl+F)"
+    : `Find words in workflow (Ctrl+F) · fitted to ${effectiveMode}`;
   positionDropdown();
+
+  if (typeof ResizeObserver === "function") {
+    launcherResizeObserver ??= new ResizeObserver(scheduleLauncherMount);
+    launcherResizeObserver.disconnect();
+    launcherResizeObserver.observe(graphControl);
+    launcherResizeObserver.observe(rightControl);
+    if (collision.element !== rightControl) launcherResizeObserver.observe(collision.element);
+  }
   return true;
 }
 
@@ -836,7 +1041,7 @@ function scheduleLauncherMount() {
 function watchForTopbar() {
   mountLauncher();
   launcherObserver = new MutationObserver(scheduleLauncherMount);
-  launcherObserver.observe(document.body, { childList: true, subtree: true });
+  launcherObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
   window.addEventListener("resize", scheduleLauncherMount);
 }
 
